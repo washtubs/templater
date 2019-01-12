@@ -37,15 +37,11 @@ const extension = "tmpl"
 
 var flags *Flags
 var t *template.Template = template.New("templater")
+var templRegEx *regexp.Regexp = regexp.MustCompile("^.+(\\." + extension + ")(\\.|$)")
 
 func scan() {
 
-	templRegEx, e := regexp.Compile("^.+\\.(" + extension + ")$")
-	if e != nil {
-		log.Fatal(e)
-	}
-
-	e = filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+	e := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
 		if err == nil && templRegEx.MatchString(info.Name()) {
 			scannedPath := path
 			outputPath := stripTempl(scannedPath)
@@ -139,8 +135,7 @@ func config() Config {
 }
 
 func stripTempl(path string) string {
-	extIndex := strings.LastIndex(path, "."+extension)
-	return path[:extIndex]
+	return strings.Replace(path, "."+extension, "", 1)
 }
 
 var skipReplace error = errors.New("should skip")
