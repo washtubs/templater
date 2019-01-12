@@ -33,7 +33,7 @@ type ExplicitConfig struct {
 const defaultConfig = `HiDpi: true
 `
 
-const extension = "templ"
+const extension = "tmpl"
 
 var flags *Flags
 var t *template.Template = template.New("templater")
@@ -192,6 +192,16 @@ func (f *Flags) shouldPromptBeforeWrite() bool {
 	return *f.interactive && !*f.stdin
 }
 
+func (f *Flags) isValid() bool {
+	if *f.scan {
+		return true
+	}
+	if (*f.stdin || *f.in != "") && (*f.stdout || *f.out != "") {
+		return true
+	}
+	return false
+}
+
 func (f *Flags) inputReader(scannedPath string) (io.Reader, error) {
 	if scannedPath != "" {
 		return os.Open(scannedPath)
@@ -252,13 +262,15 @@ func main() {
 
 	flag.Parse()
 
+	if !flags.isValid() {
+		flag.Usage()
+		os.Exit(1)
+		return
+	}
+
 	if flags.shouldScan() {
 		scan()
 	} else {
-		if len(os.Args) < 2 {
-			log.Fatal("Please supply a file to read")
-		}
-
 		r, err := flags.inputReader("")
 		if err != nil {
 			log.Fatalf("Failed to open for reading %s: %s", *flags.in, err.Error())
