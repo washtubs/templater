@@ -16,7 +16,7 @@ import (
 	"strings"
 	"text/template"
 
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
 )
 
 type Config struct {
@@ -63,6 +63,7 @@ func scan() {
 					return nil
 				}
 				err = executeTemplate(r, w)
+				fmt.Printf("Re-writing %s to %s\n", scannedPath, outputPath)
 				if err != nil {
 					log.Printf("Failed to re-write %s to %s: %s", scannedPath, outputPath, err.Error())
 				}
