@@ -27,10 +27,12 @@ type Config struct {
 }
 
 type ExplicitConfig struct {
-	HiDpi bool `yaml:"HiDpi"`
+	HiDpi    bool `yaml:"HiDpi"`
+	InDocker bool `yaml:"InDocker"`
 }
 
 const defaultConfig = `HiDpi: true
+InDocker: false
 `
 
 const extension = "tmpl"
