@@ -23,8 +23,10 @@ type Config struct {
 	Host     string
 	User     string
 	UserHost string
-	ExplicitConfig
+	Values   AnyConfig
 }
+
+type AnyConfig map[string]interface{}
 
 type ExplicitConfig struct {
 	HiDpi bool `yaml:"HiDpi"`
@@ -37,7 +39,7 @@ const extension = "tmpl"
 
 var flags *Flags
 var t *template.Template = template.New("templater")
-var templRegEx *regexp.Regexp = regexp.MustCompile("^.+(\\." + extension + ")(\\.|$)")
+var templRegEx *regexp.Regexp = regexp.MustCompile("^.*(\\." + extension + ")(\\.|$)")
 
 func scan() {
 
@@ -66,6 +68,12 @@ func scan() {
 				if err != nil {
 					log.Printf("Failed to re-write %s to %s: %s", scannedPath, outputPath, err.Error())
 				}
+
+				err = markFileReadOnly(outputPath)
+				if err != nil {
+					log.Printf("Failed to mark output path read only: %s", err.Error())
+				}
+
 			}
 		}
 		return nil
@@ -109,13 +117,13 @@ func config() Config {
 		panic(err.Error())
 	}
 
-	exConfig := ExplicitConfig{}
+	exConfig := make(AnyConfig)
 	err = yaml.UnmarshalStrict(bs, &exConfig)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
 
-	config := Config{ExplicitConfig: exConfig}
+	config := Config{Values: exConfig}
 
 	hostName, err := os.Hostname()
 	if err != nil {
@@ -140,14 +148,20 @@ func stripTempl(path string) string {
 
 var skipReplace error = errors.New("should skip")
 
+func markFileReadOnly(outputPath string) error {
+	return os.Chmod(outputPath, 0444)
+}
+
 func createOutputFile(outputPath string) (io.Writer, error) {
 	if !flags.shouldPromptBeforeWrite() {
 		// no interactive, just try to create
+		os.Remove(outputPath)
 		return os.Create(outputPath)
 	}
 
 	if _, err := os.Stat(outputPath); err != nil {
 		// interactive but does not exist
+		os.Remove(outputPath)
 		return os.Create(outputPath)
 
 	} else {
@@ -157,6 +171,7 @@ func createOutputFile(outputPath string) (io.Writer, error) {
 		text, _ := reader.ReadString('\n')
 		text = strings.TrimSpace(text)
 		if strings.EqualFold(text, "y") || strings.EqualFold(text, "yes") {
+			os.Remove(outputPath)
 			return os.Create(outputPath)
 		} else {
 			return nil, skipReplace
