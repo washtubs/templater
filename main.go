@@ -204,9 +204,17 @@ func config() Config {
 		panic(err.Error())
 	}
 
-	config.Host = hostName
-	config.User = user.Username
-	config.UserHost = user.Username + "@" + hostName
+	if *flags.hostOverride != "" {
+		config.Host = *flags.hostOverride
+	} else {
+		config.Host = hostName
+	}
+	if *flags.userOverride != "" {
+		config.User = *flags.userOverride
+	} else {
+		config.User = user.Username
+	}
+	config.UserHost = config.User + "@" + config.Host
 
 	cachedConfig = &config
 	return config
@@ -324,6 +332,8 @@ type Flags struct {
 	in          *string
 	origParent  *string
 	newParent   *string
+	hostOverride *string
+	userOverride *string
 }
 
 func (f *Flags) shouldScan() bool {
@@ -442,6 +452,8 @@ func main() {
 		flag.String("in", "", "input from file (write to stdin otherwise)"),
 		flag.String("orig", "", "original path prefix to be replaced with new"),
 		flag.String("new", "", "new path prefix"),
+		flag.String("override-host", "", "Override the value provided by .Host"),
+		flag.String("override-user", "", "Override the value provided by .User"),
 	}
 
 	flag.Parse()
