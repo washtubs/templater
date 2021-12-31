@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"flag"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"os/user"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"text/template"
@@ -27,11 +29,6 @@ type Config struct {
 }
 
 type AnyConfig map[string]interface{}
-
-type ExplicitConfig struct {
-	HiDpi    bool `yaml:"HiDpi"`
-	InDocker bool `yaml:"InDocker"`
-}
 
 const defaultConfig = `HiDpi: true
 InDocker: false
@@ -80,29 +77,66 @@ func scan() {
 				return nil
 			}
 
-			w, err := flags.outputWriter(outputPath)
+			var mode string
+			b := new(bytes.Buffer)
+			err = executeTemplate(r, b)
 			if err != nil {
-				if err == skipReplace {
-					// skip quietly: user just confirmed
+				log.Printf("Failed to execute template %s:\n    %s\n", nicePath(scannedPath), err.Error())
+				mode = "FAIL"
+			} else {
+				existing, err := flags.getExistingOutputFileContents(outputPath)
+				if err != nil  {
+					if !os.IsNotExist(err) {
+						log.Printf("Unexpected error getting existing output contents: %s", err.Error() )
+					}
+					mode = "CREATE"
+				} else {
+					if !reflect.DeepEqual(b.Bytes(), existing.Bytes()) {
+						mode = "MODIFY"
+					} else {
+						mode = "KEEP"
+					}
+				}
+			}
+
+			if mode == "MODIFY" || mode == "CREATE" {
+
+				w, err := flags.outputWriter(outputPath)
+				if err != nil {
+					if err == skipReplace {
+						// skip quietly: user just confirmed
+						return nil
+					}
+					log.Printf("Failed to create file %s: %s ... skipping", nicePath(outputPath), err.Error())
 					return nil
 				}
-				log.Printf("Failed to create file %s: %s ... skipping", nicePath(outputPath), err.Error())
-				return nil
+
+				_, err = io.Copy(w, b)
+				if err != nil {
+					log.Printf("Unexpected error copying file: %s", err)
+					mode = "FAIL"
+				}
+				if *flags.readOnly {
+					err = markFileReadOnly(outputPath)
+					if err != nil {
+						log.Printf("Failed to mark output path read only: %s", err.Error())
+					}
+				}
 			}
 
-			err = executeTemplate(r, w)
-			if flags.shouldDryRun() {
-				fmt.Printf("Will re-write %s to %s\n", nicePath(scannedPath), nicePath(outputPath))
+			if *flags.porcelain {
+				fmt.Printf("%s\t%s\t%s\n", mode, nicePath(scannedPath), nicePath(outputPath))
 			} else {
-				fmt.Printf("Re-writing %s to %s\n", nicePath(scannedPath), nicePath(outputPath))
-			}
-			if err != nil {
-				log.Printf("Failed to re-write %s to %s:\n    %s\n", nicePath(scannedPath), nicePath(outputPath), err.Error())
-			}
-
-			err = markFileReadOnly(outputPath)
-			if err != nil {
-				log.Printf("Failed to mark output path read only: %s", err.Error())
+				switch (mode) {
+				case "KEEP":
+					fmt.Printf("No change made to %s. Skipping.\n", nicePath(outputPath))
+				case "MODIFY":
+					fmt.Printf("Re-writing %s to %s.\n", nicePath(scannedPath), nicePath(outputPath))
+				case "CREATE":
+					fmt.Printf("Writing %s to new file %s.\n", nicePath(scannedPath), nicePath(outputPath))
+				case "FAIL":
+					fmt.Printf("Failed to process %s. Skipping.\n", nicePath(scannedPath))
+				}
 			}
 		}
 		return nil
@@ -127,7 +161,11 @@ func configFile() string {
 		if err != nil {
 			panic(err.Error())
 		}
-		f.WriteString(defaultConfig)
+		_, err = f.WriteString(defaultConfig)
+		if err != nil {
+			panic(err.Error())
+		}
+
 	}
 
 	return configPath
@@ -275,8 +313,10 @@ func promptAndCreateOutputFile(outputPath string) (io.Writer, error) {
 
 type Flags struct {
 	scan        *bool
+	porcelain   *bool
 	dryRun      *bool
 	interactive *bool
+	readOnly    *bool
 	out         *string
 	in          *string
 	origParent  *string
@@ -324,6 +364,23 @@ func (f *Flags) getOutputPathForNonScan() string {
 	} else {
 		return *f.out
 	}
+}
+
+func (f *Flags) getExistingOutputFileContents(outputPath string) (*bytes.Buffer, error) {
+	if outputPath == "" {
+		panic("outputPath required")
+	}
+	file, err := os.Open(outputPath)
+	if err != nil {
+		return nil, err
+	}
+	buf := new(bytes.Buffer)
+	_, err = io.Copy(buf, file)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
 
 func (f *Flags) outputWriter(outputPath string) (io.Writer, error) {
@@ -374,8 +431,10 @@ func executeTemplate(r io.Reader, w io.Writer) error {
 func main() {
 	flags = &Flags{
 		flag.Bool("scan", false, "scan directory recursively for template files (ignored if -in or -out are used)"),
-		flag.Bool("n", false, "dry run (ignored is -scan is not specified)"),
+		flag.Bool("p", false, "porcelain: output machine readable tab delimited stdout (-scan only)"),
+		flag.Bool("n", false, "dry run (-scan only)"),
 		flag.Bool("i", false, "interactive mode / prompt before replacing files (ignored if reading from stdin)"),
+		flag.Bool("ro", false, "mark output files as read-only (-scan only)"),
 		flag.String("out", "", "output to file (write to stdout otherwise)"),
 		flag.String("in", "", "input from file (write to stdin otherwise)"),
 		flag.String("orig", "", "original path prefix to be replaced with new"),
