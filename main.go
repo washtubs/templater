@@ -148,7 +148,10 @@ func scan() {
 }
 
 func configFile() string {
-	configPath := os.ExpandEnv("$HOME/.config/templater/config")
+	configPath := os.Getenv("TEMPLATER_CONFIG")
+	if configPath == "" {
+		configPath = os.ExpandEnv("$HOME/.config/templater/config")
+	}
 	_, err := os.Stat(configPath)
 
 	if os.IsNotExist(err) {
