@@ -85,9 +85,9 @@ func scan() {
 				mode = "FAIL"
 			} else {
 				existing, err := flags.getExistingOutputFileContents(outputPath)
-				if err != nil  {
+				if err != nil {
 					if !os.IsNotExist(err) {
-						log.Printf("Unexpected error getting existing output contents: %s", err.Error() )
+						log.Printf("Unexpected error getting existing output contents: %s", err.Error())
 					}
 					mode = "CREATE"
 				} else {
@@ -127,7 +127,7 @@ func scan() {
 			if *flags.porcelain {
 				fmt.Printf("%s\t%s\t%s\n", mode, nicePath(scannedPath), nicePath(outputPath))
 			} else {
-				switch (mode) {
+				switch mode {
 				case "KEEP":
 					fmt.Printf("No change made to %s. Skipping.\n", nicePath(outputPath))
 				case "MODIFY":
@@ -283,7 +283,7 @@ func markFileReadOnly(outputPath string) error {
 }
 
 func createOutputFile(outputPath string) (io.Writer, error) {
-	os.Remove(outputPath)
+	//os.Remove(outputPath)
 	dir := path.Dir(outputPath)
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -323,15 +323,15 @@ func promptAndCreateOutputFile(outputPath string) (io.Writer, error) {
 }
 
 type Flags struct {
-	scan        *bool
-	porcelain   *bool
-	dryRun      *bool
-	interactive *bool
-	readOnly    *bool
-	out         *string
-	in          *string
-	origParent  *string
-	newParent   *string
+	scan         *bool
+	porcelain    *bool
+	dryRun       *bool
+	interactive  *bool
+	readOnly     *bool
+	out          *string
+	in           *string
+	origParent   *string
+	newParent    *string
 	hostOverride *string
 	userOverride *string
 }
