@@ -62,6 +62,10 @@ func scan() {
 	}
 
 	e := filepath.Walk(cwd, func(p string, info os.FileInfo, err error) error {
+		// TODO: make this configurable
+		if info.IsDir() && info.Name() == ".templater" {
+			return filepath.SkipDir
+		}
 		if err == nil && templRegEx.MatchString(info.Name()) {
 			scannedPath := p
 
