@@ -287,7 +287,7 @@ func markFileReadOnly(outputPath string) error {
 }
 
 func createOutputFile(outputPath string) (io.Writer, error) {
-	//os.Remove(outputPath)
+	os.Remove(outputPath)
 	dir := path.Dir(outputPath)
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
@@ -357,7 +357,7 @@ func (f *Flags) isValid() bool {
 }
 
 func (f *Flags) isStdin() bool {
-	return *f.in == ""
+	return *f.in == "" && !*f.scan
 }
 
 func (f *Flags) inputReader(scannedPath string) (io.Reader, error) {
