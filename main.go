@@ -123,7 +123,8 @@ func scan() {
 				if *flags.readOnly {
 					err = markFileReadOnly(outputPath)
 					if err != nil {
-						log.Printf("Failed to mark output path read only: %s", err.Error())
+						log.Printf("Failed to mark %s read only: %s", outputPath, err.Error())
+						mode = "FAIL"
 					}
 				}
 			}
@@ -294,7 +295,21 @@ func createOutputFile(outputPath string) (io.Writer, error) {
 		return nil, err
 	}
 
-	return os.Create(outputPath)
+	w, err := os.Create(outputPath)
+	if err != nil {
+		log.Printf("Failed to create file at %s: %s", outputPath, err)
+		return nil, err
+	}
+
+	if *flags.readOnly {
+		err = markFileReadOnly(outputPath)
+		if err != nil {
+			log.Printf("Failed to mark %s read only: %s", outputPath, err.Error())
+			return nil, err
+		}
+	}
+
+	return w, err
 }
 
 func promptAndCreateOutputFile(outputPath string) (io.Writer, error) {
@@ -451,7 +466,7 @@ func main() {
 		flag.Bool("p", false, "porcelain: output machine readable tab delimited stdout (-scan only)"),
 		flag.Bool("n", false, "dry run (-scan only)"),
 		flag.Bool("i", false, "interactive mode / prompt before replacing files (ignored if reading from stdin)"),
-		flag.Bool("ro", false, "mark output files as read-only (-scan only)"),
+		flag.Bool("ro", false, "mark output files as read-only"),
 		flag.String("out", "", "output to file (write to stdout otherwise)"),
 		flag.String("in", "", "input from file (read from stdin otherwise)"),
 		flag.String("orig", "", "original path prefix to be replaced with new"),
