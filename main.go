@@ -73,6 +73,11 @@ func scan() {
 				panic(scannedPath + " is not absolute")
 			}
 
+			if !strings.HasPrefix(p, flags.origParentAbs()) {
+				log.Printf("Skipping %s, not under %s", p, *flags.origParent)
+				return nil
+			}
+
 			outputPath := convertOutputPath(scannedPath)
 
 			r, err := flags.inputReader(scannedPath)
@@ -229,7 +234,7 @@ func stripTempl(base string) string {
 	return strings.Replace(base, "."+extension, "", 1)
 }
 
-// if scanned path assume input path from flags
+// if scanned path, assume input path from flags
 // return the input param if can't convert
 // DOES NOT consult flags.out / up to caller
 func convertOutputPath(scannedPath string) string {
@@ -251,6 +256,7 @@ func convertOutputPath(scannedPath string) string {
 			if err != nil {
 				log.Fatalf("Error for %s: %s", *flags.in, err)
 			}
+			// Proceed with the scannedPath flags.in in absolute form
 		}
 	}
 
@@ -264,14 +270,17 @@ func convertOutputPath(scannedPath string) string {
 	if origParent != "" && newParent != "" {
 		canConvertDir = true
 		if !strings.HasPrefix(inputDir, origParent) {
-			log.Fatalf("Fatal: %s is not under %s", inputDir, origParent)
+			panic(fmt.Sprintf("%s is not under %s", inputDir, origParent))
 		}
 	}
 
 	if canConvertDir {
+		// Fast equal. We already know origParent is a prefix of inputDir
 		if len(origParent) == len(inputDir) {
+			// File is at the root of origParent
 			outputDir = newParent
 		} else {
+			// Append inputDir to newParent minus the origParent part
 			outputDir = newParent + inputDir[len(origParent):]
 		}
 	} else {
@@ -429,6 +438,9 @@ func (f *Flags) outputWriter(outputPath string) (io.Writer, error) {
 }
 
 func (f *Flags) newParentAbs() string {
+	if *f.newParent == "" {
+		return ""
+	}
 	abs, err := filepath.Abs(*f.newParent)
 	if err != nil {
 		log.Fatalf("Error for %s: %s", *f.newParent, err)
@@ -437,6 +449,9 @@ func (f *Flags) newParentAbs() string {
 }
 
 func (f *Flags) origParentAbs() string {
+	if *f.origParent == "" {
+		return ""
+	}
 	abs, err := filepath.Abs(*f.origParent)
 	if err != nil {
 		log.Fatalf("Error for %s: %s", *f.origParent, err)
@@ -467,8 +482,8 @@ func main() {
 		flag.Bool("n", false, "dry run (-scan only)"),
 		flag.Bool("i", false, "interactive mode / prompt before replacing files (ignored if reading from stdin)"),
 		flag.Bool("ro", false, "mark output files as read-only"),
-		flag.String("out", "", "output to file (write to stdout otherwise)"),
-		flag.String("in", "", "input from file (read from stdin otherwise)"),
+		flag.String("out", "", "output to file (otherwise: infer the output file name from the input file name OR write to stdout if reading from stdin)"),
+		flag.String("in", "", "input from file (otherwise: read from stdin)"),
 		flag.String("orig", "", "original path prefix to be replaced with new"),
 		flag.String("new", "", "new path prefix"),
 		flag.String("override-host", "", "Override the value provided by .Host"),
