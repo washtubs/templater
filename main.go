@@ -453,7 +453,7 @@ func main() {
 		flag.Bool("i", false, "interactive mode / prompt before replacing files (ignored if reading from stdin)"),
 		flag.Bool("ro", false, "mark output files as read-only (-scan only)"),
 		flag.String("out", "", "output to file (write to stdout otherwise)"),
-		flag.String("in", "", "input from file (write to stdin otherwise)"),
+		flag.String("in", "", "input from file (read from stdin otherwise)"),
 		flag.String("orig", "", "original path prefix to be replaced with new"),
 		flag.String("new", "", "new path prefix"),
 		flag.String("override-host", "", "Override the value provided by .Host"),
